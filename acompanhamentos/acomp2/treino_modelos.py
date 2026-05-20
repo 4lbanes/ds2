@@ -16,19 +16,18 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+from pipeline import HousePricesCleaner, ID_COLUMN, TARGET
+
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 ACOMP_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
-CLEAN_DATA_DIR = DATA_DIR / "processed"
-TRAIN_PATH = CLEAN_DATA_DIR / "treino_limpo.csv"
-PUBLIC_TEST_PATH = CLEAN_DATA_DIR / "teste_publico_limpo.csv"
+TRAIN_PATH = DATA_DIR / "treino.csv"
+PUBLIC_TEST_PATH = DATA_DIR / "teste_publico.csv"
 MODEL_PATH = ACOMP_DIR / "modelo_acomp2.joblib"
 METRICS_PATH = ACOMP_DIR / "metricas_preliminares.csv"
 PUBLIC_PREDICTIONS_PATH = ACOMP_DIR / "predicoes_teste_publico.csv"
 
-TARGET = "SalePrice"
-ID_COLUMN = "Id"
 RANDOM_STATE = 42
 VALIDATION_SIZE = 0.2
 
@@ -135,8 +134,8 @@ def candidate_regressors() -> dict[str, object]:
 def train_and_select_model() -> tuple[pd.DataFrame, Pipeline, list[str]]:
     if not TRAIN_PATH.exists():
         raise FileNotFoundError(
-            f"Dataset limpo de treino nao encontrado em {TRAIN_PATH}. "
-            "Execute o notebook de limpeza do Acompanhamento 1 antes do treino."
+            f"Dataset bruto de treino nao encontrado em {TRAIN_PATH}. "
+            "O pipeline deve ser treinado a partir do CSV sujo fornecido pelo projeto."
         )
 
     train_df = pd.read_csv(TRAIN_PATH)
@@ -156,6 +155,7 @@ def train_and_select_model() -> tuple[pd.DataFrame, Pipeline, list[str]]:
     for name, regressor in candidate_regressors().items():
         pipeline = Pipeline(
             steps=[
+                ("cleaner", HousePricesCleaner()),
                 ("preprocessor", build_preprocessor(numeric_cols, categorical_cols)),
                 ("model", build_model(regressor)),
             ]
@@ -168,6 +168,7 @@ def train_and_select_model() -> tuple[pd.DataFrame, Pipeline, list[str]]:
 
     best_pipeline = Pipeline(
         steps=[
+            ("cleaner", HousePricesCleaner()),
             ("preprocessor", build_preprocessor(numeric_cols, categorical_cols)),
             ("model", build_model(candidate_regressors()[best_model_name])),
         ]
@@ -184,6 +185,7 @@ def train_and_select_model() -> tuple[pd.DataFrame, Pipeline, list[str]]:
             "selected_model": best_model_name,
             "train_path": str(TRAIN_PATH.relative_to(BASE_DIR)),
             "public_test_path": str(PUBLIC_TEST_PATH.relative_to(BASE_DIR)),
+            "cleaning": "HousePricesCleaner dentro do sklearn Pipeline",
         },
         MODEL_PATH,
     )
@@ -194,8 +196,8 @@ def train_and_select_model() -> tuple[pd.DataFrame, Pipeline, list[str]]:
 def predict_public_test(best_pipeline: Pipeline, feature_columns: list[str]) -> pd.DataFrame:
     if not PUBLIC_TEST_PATH.exists():
         raise FileNotFoundError(
-            f"Dataset limpo de teste publico nao encontrado em {PUBLIC_TEST_PATH}. "
-            "Execute o notebook de limpeza do Acompanhamento 1 antes de gerar predicoes."
+            f"Dataset bruto de teste publico nao encontrado em {PUBLIC_TEST_PATH}. "
+            "O pipeline deve receber e limpar o CSV sujo antes de gerar predicoes."
         )
 
     public_test = pd.read_csv(PUBLIC_TEST_PATH)
